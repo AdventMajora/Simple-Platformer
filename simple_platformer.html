@@ -1,0 +1,503 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.2/jquery.min.js"></script>
+	</head>
+	<canvas id="screen" height="400" width="400" style="border:1px solid black;">
+	<script>
+	
+		var pressedKeys = [];
+		var blocks = [];
+		var grasses = [];
+		var trees = [];
+		var mountains = [];
+		var score = 0;
+		var isPlaying = true;
+		var restartTime = 100;
+		var blockSpeed = 1;
+		var blockRate = 500;
+		var paused = false;
+		var pauseBuff = 10;
+		
+		var canvas = document.getElementById('screen');
+		var ctx = canvas.getContext('2d');
+		ctx.imageSmoothingEnabled = false;
+		
+		var player = {
+			x:32,
+			y:0,
+			health:3,
+			maxHealth:16,
+			moveSpeed:1,
+			canJump:2,
+			isGrounded:false,
+			isJumping:false,
+			jumpTime:24,
+			jumpSpeed:8,
+			fallTime:0,
+			invincible:0,
+			init: function() {
+				this.x = 32;
+				this.y = 0;
+				this.health = 3;
+				this.canJump = 10;
+				this.isGrounded = false;
+				this.isJumping = false;
+				this.invincible = 0;
+			},
+			update: function() {
+				
+				if (this.health > 16) {
+					this.health = 16;
+				}
+				
+				if (this.invincible > 0) {
+					this.invincible--;
+				} else {
+					this.invincible = 0;
+				}
+			
+				if (this.jumpTime < 0) {
+					this.isJumping = false;
+					this.jumpTime = 24;
+				}
+			
+				if (this.isJumping == false) {
+					if (this.y < 175) {
+						this.fallTime++;
+						this.y+=this.jumpSpeed*(this.fallTime/24);
+					}
+				}
+				
+				if (this.y >= 175) {
+					this.y = 175;
+					this.isGrounded = true;
+					this.isJumping = false;
+					this.fallTime = 0;
+				}
+				
+				if (pressedKeys.indexOf('A') > -1 && this.x > 0) {
+					this.x-=this.moveSpeed;
+				}
+				if (pressedKeys.indexOf('D') > -1 && this.x+16 < 200) {
+					this.x+=this.moveSpeed;
+				}
+				
+				if (pressedKeys.indexOf('W') > -1 && this.isGrounded == true && this.canJump == 0) {
+					this.isJumping = true;
+					this.canJump = 2;
+					this.isGrounded = false;
+				}
+				
+				if (pressedKeys.indexOf('W') < 0) {
+					this.isJumping = false;
+					this.jumpTime = 24;
+				}
+				
+				if (this.isJumping == true) {
+					this.jumpTime--;
+                    this.fallTime = this.jumpTime;
+				}
+				
+				if (this.isJumping == true && this.jumpTime > 0) {
+					this.y-=this.jumpSpeed*(this.jumpTime/24);
+				}
+				
+				if (this.isGrounded == true) {
+					this.canJump--;
+				}
+				if (this.canJump < 0) {
+					this.canJump = 0;
+				}
+				
+			},
+			draw: function() {
+				ctx.fillStyle = 'orange';
+				if (this.invincible > 0 ) {
+					if (this.invincible%2 == 0) {
+						ctx.fillStyle = 'black';
+					} else {
+						ctx.fillStyle = 'red';
+					}
+				}
+				ctx.fillRect(this.x,this.y,16,16);
+			}
+		}
+		
+		var block = {
+			x:200,
+			y:175,
+			speed:2,
+			update:function(){
+				this.x-=blockSpeed;
+				if (this.x+16 < 0) {
+					score++;
+					if (score%10==0) {
+						blockSpeed+=.2;
+						player.health++;
+					}
+					blocks.shift();
+				}
+				if (player.isGrounded == true && player.invincible == 0) {
+					if (player.x>this.x-16 && player.x<this.x+16) {
+						player.invincible = 60;
+						player.health--;
+					}
+				}
+			},
+			draw:function() {
+				ctx.fillStyle = 'yellow';
+				ctx.fillRect(this.x,this.y,16,16);
+			}
+		}
+		
+		var highBlock = {
+			x:200,
+			y:143,
+			speed:2,
+			update:function(){
+				this.x-=blockSpeed;
+				if (this.x+16< 0) {
+					score++;
+					if (score%10==0) {
+						blockSpeed+=.2;
+						player.health++;
+					}
+					blocks.shift();
+				}
+				if (player.invincible == 0) {
+					if (player.x>this.x-16 && player.x<this.x+16 && player.y>this.y-16 && player.y<this.y+16) {
+						player.invincible = 60;
+						player.health--;
+					}
+				}
+			},
+			draw:function() {
+				ctx.fillStyle = 'yellow';
+				ctx.fillRect(this.x,this.y,16,16);
+			}
+		}
+		
+		var moveBlock = {
+			x:200,
+			y:151,
+			speed:2,
+			dir:0,
+			update:function(){
+				this.x-=blockSpeed;
+				if (this.dir == 0) {
+					this.y--;
+				}
+				if (this.dir == 1) {
+					this.y++;
+				}
+				if (this.y < 120) {
+					this.dir = 1;
+				}
+				if (this.y >= 175) {
+					this.dir = 0;
+				}
+				if (this.x+16 < 0) {
+					score++;
+					if (score%10==0) {
+						blockSpeed+=.2;
+						player.health++;
+					}
+					blocks.shift();
+				}
+				if (player.invincible == 0) {
+					if (player.x>this.x-16 && player.x<this.x+16 && player.y>this.y-16 && player.y<this.y+16) {
+						player.invincible = 60;
+						player.health--;
+					}
+				}
+			},
+			draw:function() {
+				ctx.fillStyle = 'yellow';
+				ctx.fillRect(this.x,this.y,16,16);
+			}
+		}
+		
+		var grass = {
+			x:200,
+			y:183,
+			speed: blockSpeed-.2,
+			update: function() {
+				this.speed = blockSpeed-.2;
+				this.x-=this.speed;
+				if (this.x+8<0) {
+					grasses.shift();
+				}
+			},
+			draw: function() {
+				ctx.fillStyle = 'darkgreen';
+				ctx.beginPath();
+				ctx.moveTo(this.x,191);
+				ctx.lineTo(this.x+4,this.y);
+				ctx.lineTo(this.x+8,191);
+				ctx.fill();
+			}
+		}
+		
+		var tree = {
+			x:200,
+			y:175,
+			speed: blockSpeed-.2,
+			update: function() {
+				this.speed = blockSpeed*.5;
+				this.x-=this.speed;
+				if (this.x+16<0) {
+					trees.shift();
+				}
+			},
+			draw: function() {
+				ctx.fillStyle = 'green';
+				ctx.beginPath();
+				ctx.moveTo(this.x,191);
+				ctx.lineTo(this.x+8,this.y);
+				ctx.lineTo(this.x+16,191);
+				ctx.fill();
+			}
+		}
+		
+		var mountain = {
+			x:200,
+			y:183,
+			l: 40,
+			r: 40,
+			speed: blockSpeed-(.2*4),
+			update: function() {
+				this.speed = blockSpeed*.1;
+				this.x-=this.speed;
+				if (this.x+this.r<0) {
+					mountains.shift();
+				}
+			},
+			draw: function() {
+				ctx.fillStyle = 'grey';
+				ctx.beginPath();
+				ctx.moveTo(this.x,191);
+				ctx.lineTo(this.x+this.l,this.y-60);
+				ctx.lineTo(this.x+this.r,191);
+				ctx.fill();
+			}
+		}
+		
+		document.addEventListener('keydown', function(event) {
+			switch(event.keyCode) {
+				case 87: if (pressedKeys.indexOf('W')<0) {
+									pressedKeys.push('W');
+								}
+								break;
+				case 65: if (pressedKeys.indexOf('A')<0) {
+									pressedKeys.push('A');
+								}
+								break;
+				case 83: if (pressedKeys.indexOf('S')<0) {
+									pressedKeys.push('S');
+								}
+								break;
+				case 68: if (pressedKeys.indexOf('D')<0) {
+									pressedKeys.push('D');
+								}
+								break;
+				case 27: if (pressedKeys.indexOf('ESC')<0) {
+									pressedKeys.push('ESC');
+								}
+								break;
+			}
+		});
+		
+		document.addEventListener('keyup', function(event) {
+			switch(event.keyCode) {
+				case 87: pressedKeys.splice(pressedKeys.indexOf('W'),1);
+								break;
+				case 65: pressedKeys.splice(pressedKeys.indexOf('A'),1);
+								break;
+				case 83: pressedKeys.splice(pressedKeys.indexOf('S'),1);
+								break;
+				case 68: pressedKeys.splice(pressedKeys.indexOf('D'),1);
+								break;
+				case 27: pressedKeys.splice(pressedKeys.indexOf('ESC'),1);
+								break;
+			}
+		})
+		
+		mainLoop();
+		
+		function mainLoop() {
+            
+            if (pauseBuff > 0 && paused == true) {
+                pauseBuff--;
+            }
+
+            if (pauseBuff < 20 && paused == false) {
+                pauseBuff++;
+            }
+
+            if (player.health <=0) {
+                isPlaying = false;
+            }
+
+            if (pressedKeys.indexOf('ESC') > -1 && paused == false && pauseBuff >= 20) {
+                paused = true;
+                pauseBuff = 20;
+            }
+
+            if (pressedKeys.indexOf('ESC') > -1 && paused == true && pauseBuff <= 0) {
+                paused = false;
+                pauseBuff = 0;
+            }
+
+            if (isPlaying == true) {
+
+                if (paused == false) {
+
+                    if (Math.floor(Math.random()*80/blockSpeed) == 0 && mountains.length < 17) {
+                        mountains.push($.extend({},mountain));
+                        mountains[mountains.length-1].y+=Math.floor(Math.random()*50);
+                        mountains[mountains.length-1].l+=Math.floor(Math.random()*30);
+                        mountains[mountains.length-1].r+=mountains[mountains.length-1].l+Math.floor(Math.random()*30);
+                    }
+
+                    if (Math.floor(Math.random()*8/blockSpeed) == 0 && trees.length < 50){
+                        trees.push($.extend({},tree));
+                        trees[trees.length-1].y-=Math.floor(Math.random()*20);
+                    }
+
+                    if (Math.floor(Math.random()*8/blockSpeed) == 0 && grasses.length < 25){
+                        grasses.push($.extend({},grass));
+                    }
+
+                    if (blocks.length < 8) {
+                        blockRate = 500-score;
+                        if (blockRate<6) {
+                            blockRate = 6;
+                        }
+                        if (Math.floor(Math.random()*blockRate) < 5) {
+
+                            if (score < 5) {
+                                blocks.push($.extend({},block));
+                            }
+
+                            if (score >= 5 && score < 20) {
+                                if (Math.floor(Math.random()*4) == 0) {
+                                    blocks.push($.extend({},highBlock));
+                                } else {
+                                    blocks.push($.extend({},block));
+                                }
+                            }
+
+                            if (score >= 20 && score < 50) {
+
+                                var rand = Math.floor(Math.random()*5) 
+
+                                if (rand == 0) {
+                                    blocks.push($.extend({},moveBlock));
+                                } else if (rand == 1 || rand == 2) {
+                                    blocks.push($.extend({},highBlock));
+                                } else {
+                                    blocks.push($.extend({},block));
+                                }
+                            }
+
+                            if (score >= 50) {
+
+                                var rand = Math.floor(Math.random()*8) 
+
+                                if (rand == 0) {
+                                    blocks.push($.extend({},moveBlock));
+                                } else if (rand == 1) {
+                                    blocks.push($.extend({},highBlock));
+                                } else {
+                                    blocks.push($.extend({},block));
+                                }
+                            }
+                        }
+                    }
+                    update();
+                }
+            } else {
+                restartTime--;
+                if (restartTime == 0) {
+                    restartTime++;
+
+                    if (pressedKeys.indexOf('W') > -1) {
+                        player.init();
+                        isPlaying = true;
+                        restartTime = 100;
+                        score = 0;
+                        blocks = [];
+                        grasses = [];
+                        trees = [];
+                        mountains = [];
+                        blockSpeed = 1;
+                        blockRate = 500;
+                    }
+                }
+            }
+            render();
+			window.requestAnimationFrame(mainLoop);
+		}
+        
+        function render() {
+            
+            ctx.scale(2,2);
+			ctx.fillStyle = 'black';
+			ctx.fillRect(0,0,200,200);
+            
+            ctx.fillStyle = 'white';
+			ctx.fillText('SCORE: '+score,4,32);
+			
+			mountains.forEach(function(entry) {
+				entry.draw();
+			});
+			trees.forEach(function(entry) {
+				entry.draw();
+			});
+			grasses.forEach(function(entry) {
+				entry.draw();
+			});
+			blocks.forEach(function(entry) {
+				entry.draw();
+			});
+			player.draw();
+            
+            if (isPlaying == true) {
+                ctx.fillStyle = 'red';
+				for (var i=0; i<player.health;i++) {
+					ctx.fillRect((12*i)+4,4,8,16);
+				}
+                
+                if (paused == true) {
+					ctx.fillStyle = 'white';
+					ctx.fillText('PAUSED',75,100);
+				}
+            } else {
+                ctx.fillText('GAME OVER',4,48);    
+                if (restartTime == 0) {
+                    ctx.fillStyle = 'white';
+					ctx.fillText('W TO RESTART',4,64);
+                }
+            }
+            ctx.scale(.5,.5);
+        }
+        
+        function update() {
+            blocks.forEach(function(entry) {
+                entry.update();
+            });
+            mountains.forEach(function(entry) {
+                entry.update();
+            });
+            trees.forEach(function(entry) {
+                entry.update();
+            });
+            grasses.forEach(function(entry) {
+                entry.update();
+            });
+            player.update();
+        }
+		
+	</script>	
+</html>
